@@ -61,7 +61,7 @@ do
         
         local CF, Size = Model:GetBoundingBox()
         local Start, End = CF.Position - Size / 2, CF.Position + Size / 2
-        local Center = self:Format(CFrame.new((Start + End) / 2)) - Vector3.new(2, 0, 2)
+        local Center = self:Format(CFrame.new((Start + End) / 2)) - Vector3.new(1, 0, 0)
 
         for i, v in next, Model:GetChildren() do
             local Inserted = {}
