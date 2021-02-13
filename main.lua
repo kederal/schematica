@@ -1,6 +1,7 @@
 local baseUrl = "https://raw.githubusercontent.com/Jxl-v/schematica/main/"
 
-local function require_module(module) return loadstring(game:HttpGet(string.format("%sdependencies/%s", baseUrl, module)))() end
+--local function require_module(module) return loadstring(game:HttpGet(string.format("%sdependencies/%s", baseUrl, module)))() end
+local function require_module(module) return loadstring(readfile(string.format("schematica-script-workspace/dependencies/%s", module)))() end
 
 local Http = game.HttpService
 local env = Http:JSONDecode(game:HttpGet(baseUrl .. "env.json"))
@@ -9,9 +10,13 @@ local env = Http:JSONDecode(game:HttpGet(baseUrl .. "env.json"))
 local Player = game.Players.LocalPlayer
 
 local Serializer = require_module("serializer.lua")
+print('1/4 loaded', Serializer)
 local Builder = require_module("builder.lua")
+print('2/4 loaded', Builder)
 local Printer = require_module("printer.lua")
+print('3/4 loaded', Printer)
 local Library = require_module("venyx.lua")
+print('4/4 loaded', Library)
 
 if game.CoreGui:FindFirstChild("Schematica") then
     game.CoreGui.Schematica:Destroy()
@@ -634,7 +639,7 @@ do
     end
 
     local Http = game.HttpService
-    local Other = Schematica:addPage("Other")
+    local Other = Schematica:addPage("File Stuff")
     local ConvertOldSection = Other:addSection("Convert Old Build")
 
     local V = {}
@@ -759,6 +764,66 @@ do
                 Schematica:Notify("Build Uploaded", "Copied to clipboard")
             else
                 Schematica:Notify("Error", JSONResponse.status)
+            end
+        end
+    end)
+end
+
+do
+    local function getDisplayName(name)
+        for i, v in pairs(game.ReplicatedStorage.Tools:GetChildren()) do
+            if v.Name:lower() == name:lower() and v:FindFirstChild("DisplayName") then
+                return v:FindFirstChild("DisplayName").Value
+            end
+        end
+    end
+
+    local Utilities = Schematica:addPage("Utilities")
+    local RequiredMats = Utilities:addSection("View Required Materials")
+
+    local V = {
+        Id = ""
+    }
+
+    RequiredMats:addTextbox("Build ID", "", function(Id)
+        V.Id = Id
+    end)
+
+    local currentElements = {}
+
+    local materials = Utilities:addSection("Materials")
+    RequiredMats:addButton("View Materials", function()
+        if isfile("builds/" .. V.Id .. ".s") then
+            local Data = Http:JSONDecode(readfile("builds/" .. V.Id .. ".s"))
+
+            for i, v in next, currentElements do
+                table.remove(materials.modules, table.find(materials.modules, v))
+                v:Destroy()
+            end
+
+            materials:Resize()
+
+            for i, v in next, Data.Blocks do
+                table.insert(currentElements, materials:addLabel(getDisplayName(i) .. " : " .. #v))
+            end
+            materials:Resize()
+        else
+            local Response = Http:JSONDecode(game:HttpGet(env.get .. V.Id))
+            if Response.success == true then
+                local Data = Response.data
+                writefile("builds/" .. V.Id .. ".s", game.HttpService:JSONEncode(Response.data))
+
+                for i, v in next, currentElements do
+                    table.remove(materials.modules, table.find(materials.modules, v))
+                    v:Destroy()
+                end
+
+                materials:Resize()
+
+                for i, v in next, Data.Blocks do
+                    table.insert(currentElements, materials:addLabel(getDisplayName(i) .. " : " .. #v))
+                end
+                materials:Resize()
             end
         end
     end)
