@@ -1,7 +1,7 @@
 local baseUrl = "https://raw.githubusercontent.com/Jxl-v/schematica/main/"
 
---local function require_module(module) return loadstring(game:HttpGet(string.format("%sdependencies/%s", baseUrl, module)))() end
-local function require_module(module) return loadstring(readfile(string.format("schematica-script-workspace/dependencies/%s", module)))() end
+local function require_module(module) return loadstring(game:HttpGet(string.format("%sdependencies/%s", baseUrl, module)))() end
+--local function require_module(module) return loadstring(readfile(string.format("schematica-script-workspace/dependencies/%s", module)))() end
 
 local Http = game.HttpService
 local env = Http:JSONDecode(game:HttpGet(baseUrl .. "env.json"))
