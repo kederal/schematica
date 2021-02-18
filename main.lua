@@ -1,132 +1,129 @@
-local baseUrl = "https://raw.githubusercontent.com/Jxl-v/schematica/main/"
+local BASE_URL = "https://raw.githubusercontent.com/Jxl-v/schematica/main/"
 
-local function require_module(module) return loadstring(game:HttpGet(string.format("%sdependencies/%s", baseUrl, module)))() end
---local function require_module(module) return loadstring(readfile(string.format("schematica-script-workspace/dependencies/%s", module)))() end
-
-local Http = game.HttpService
-local env = Http:JSONDecode(game:HttpGet(baseUrl .. "env.json"))
-
---//Getting the modules
-local Player = game.Players.LocalPlayer
+--local function require_module(module) return loadstring(game:HttpGet(string.format("%sdependencies/%s", BASE_URL, module)))() end
+local function require_module(module) return loadstring(readfile(string.format("schematica-script-workspace/dependencies/%s", module)))() end
 
 local Serializer = require_module("serializer.lua")
-print('1/4 loaded', Serializer)
 local Builder = require_module("builder.lua")
-print('2/4 loaded', Builder)
 local Printer = require_module("printer.lua")
-print('3/4 loaded', Printer)
 local Library = require_module("venyx.lua")
-print('4/4 loaded', Library)
 
-if game.CoreGui:FindFirstChild("Schematica") then
-    game.CoreGui.Schematica:Destroy()
-end
-
+if game.CoreGui:FindFirstChild("Schematica") then game.CoreGui.Schematica:Destroy() end
 if not isfolder("builds") then makefolder("builds") end
 
-local req = request or http_request or syn and syn.request
+local Fetch = request or http_request or syn and syn.request
+local Http = game:GetService("HttpService")
+local Env = Http:JSONDecode(game:HttpGet(BASE_URL .. "env.json"))
+
+local Player = game.Players.LocalPlayer
+local Mouse = Player:GetMouse()
 
 local Schematica = Library.new("Schematica")
-local Mouse = Player:GetMouse()
+
+local GlobalToggles = {}
+
+local function Toggle(Name)
+    for i, v in next, GlobalToggles do
+        if i ~= Name then   
+            v.toggle(false)
+        end
+    end
+end
 
 do
     local Build = Schematica:addPage("Build")
     local round = math.round
 
-    local V = {}
+    local Flags = {
+        ChangingPosition = false,
+        BuildId = '0',
+        ShowPreview = true,
+        Visibility = 0.5,
+        DragCF = 0
+    }
 
-    V.Connections = {}
-
-    V.ChangingPosition = false;
-    V.BuildId = '0';
-    V.ShowPreview = true;
-    V.Build = nil
-    V.Visibility = 0.5
-    
-    V.Indicator = Instance.new("Part")
-    V.Indicator.Size = Vector3.new(3.1, 3.1, 3.1)
-    V.Indicator.Transparency = 0.5
-    V.Indicator.Anchored = true
-    V.Indicator.CanCollide = false
-    V.Indicator.BrickColor = BrickColor.new("Bright green")
-    V.Indicator.TopSurface = Enum.SurfaceType.Smooth
-    V.Indicator.Parent = workspace
+    local Indicator = Instance.new("Part")
+    Indicator.Size = Vector3.new(3.1, 3.1, 3.1)
+    Indicator.Transparency = 0.5
+    Indicator.Anchored = true
+    Indicator.CanCollide = false
+    Indicator.BrickColor = BrickColor.new("Bright green")
+    Indicator.TopSurface = Enum.SurfaceType.Smooth
+    Indicator.Parent = workspace
 
     local Handles = Instance.new("Handles")
     Handles.Style = Enum.HandlesStyle.Movement
-    Handles.Adornee = V.Indicator
-    Handles.Parent = game.CoreGui
+    Handles.Adornee = Indicator
     Handles.Visible = false
+    Handles.Parent = game.CoreGui
 
-    V.DragCF = 0
-
-    V.Connections.HandleDown = Handles.MouseButton1Down:Connect(function()
-        V.DragCF = Handles.Adornee.CFrame
+    Handles.MouseButton1Down:Connect(function()
+        Flags.DragCF = Handles.Adornee.CFrame
     end)
 
-    V.Connections.HandleDrag = Handles.MouseDrag:Connect(function(Face, Distance)
-        if V.Indicator.Parent.ClassName == "Model" then
-            V.Indicator.Parent:SetPrimaryPartCFrame(V.DragCF + Vector3.FromNormalId(Face) * (round(Distance / 3) * 3))
+    Handles.MouseDrag:Connect(function(Face, Distance)
+        if Indicator.Parent.ClassName == "Model" then
+            Indicator.Parent:SetPrimaryPartCFrame(Flags.DragCF + Vector3.FromNormalId(Face) * (round(Distance / 3) * 3))
         else
-            V.Indicator.CFrame = V.DragCF + Vector3.FromNormalId(Face) * (round(Distance / 3) * 3)
+            Indicator.CFrame = Flags.DragCF + Vector3.FromNormalId(Face) * (round(Distance / 3) * 3)
         end
     end)
-    --//UI
 
-    V.SelectSection = Build:addSection("Selecting Build")
-    V.BuildIdBox = V.SelectSection:addTextbox("Build ID", "0", function(buildId)
-        V.BuildId = buildId:gsub("%s", "")
+    local SelectSection = Build:addSection("Selecting Build")
+
+    SelectSection:addTextbox("Build ID", "0", function(buildId)
+        Flags.BuildId = buildId:gsub("%s", "")
     end)
 
-    V.Download = V.SelectSection:addButton("Download / Load", function()
-        V.SelectSection:updateButton(V.Download, "Please wait ...")
+    Flags.Download = SelectSection:addButton("Download / Load", function()
+        SelectSection:updateButton(Flags.Download, "Please wait ...")
 
-        if isfile("builds/" .. V.BuildId .. ".s") then
-            if V.Build then 
-                V.Indicator.Parent = workspace
-                V.Build:Destroy()
+        if isfile("builds/" .. Flags.BuildId .. ".s") then
+            if Flags.Build then 
+                Indicator.Parent = workspace
+                Flags.Build:Destroy()
             end
-            local Data = Http:JSONDecode(readfile("builds/" .. V.BuildId .. ".s"))
-            V.Build = Builder.new(Data)
-            V.SelectSection:updateButton(V.Download, "File loaded!")
+            local Data = Http:JSONDecode(readfile("builds/" .. Flags.BuildId .. ".s"))
+            Flags.Build = Builder.new(Data)
+            SelectSection:updateButton(Flags.Download, "File loaded!")
         else
-            local Response = Http:JSONDecode(game:HttpGet(env.get .. V.BuildId))
+            local Response = Http:JSONDecode(game:HttpGet(Env.get .. Flags.BuildId))
             if Response.success == true then
-                if V.Build then 
-                    V.Indicator.Parent = workspace
-                    V.Build:Destroy()
+                if Flags.Build then 
+                    Indicator.Parent = workspace
+                    Flags.Build:Destroy()
                 end
-                writefile("builds/" .. V.BuildId .. ".s", game.HttpService:JSONEncode(Response.data))
-                V.Build = Builder.new(Response.data)
-                V.SelectSection:updateButton(V.Download, "Downloaded!")
+                Flags.Build = Builder.new(Response.data)
+                SelectSection:updateButton(Flags.Download, "Downloaded!")
+                writefile("builds/" .. Flags.BuildId .. ".s", game.HttpService:JSONEncode(Response.data))
             else
                 if Response.status == 404 then
-                    V.SelectSection:updateButton(V.Download, "Not found")
+                    SelectSection:updateButton(Flags.Download, "Not found")
                 elseif Response.status == 400 then
-                    V.SelectSection:updateButton(V.Download, "Error")
+                    SelectSection:updateButton(Flags.Download, "Error")
                 end
             end
         end
         wait(1)
-        V.SelectSection:updateButton(V.Download, "Download")
+        SelectSection:updateButton(Flags.Download, "Download")
     end)
 
-    V.PositionSettings = Build:addSection("Position Settings")
+    local PositionSettings = Build:addSection("Position Settings")
 
-    V.ChangePositionToggle = V.PositionSettings:addToggle("Change Position", false, function(willChange)
-        V.ChangingPosition = willChange
+    GlobalToggles.ChangePositionToggle = PositionSettings:addToggle("Change Position", false, function(willChange)
+        Flags.ChangingPosition = willChange
     end)
 
-    V.Connections.OnClick = Mouse.Button1Down:Connect(function()
+    Mouse.Button1Down:Connect(function()
         if Mouse.Target then
-            if V.ChangingPosition then
+            if Flags.ChangingPosition then
                 if Mouse.Target.Parent.Name == "Blocks" or Mouse.Target.Parent.Parent.Name == "Blocks" then
                     local Part = Mouse.Target.Parent.Name == "Blocks" and Mouse.Target or Mouse.Target.Parent.Parent.Name == "Blocks" and Mouse.Target.Parent
-                    Handles.Visible = V.ShowPreview
-                    if V.Indicator.Parent and V.Indicator.Parent.ClassName == "Model" then
-                        V.Indicator.Parent:SetPrimaryPartCFrame(CFrame.new(Part.Position))
+                    Handles.Visible = Flags.ShowPreview
+                    if Indicator.Parent and Indicator.Parent.ClassName == "Model" then
+                        Indicator.Parent:SetPrimaryPartCFrame(CFrame.new(Part.Position))
                     else
-                        V.Indicator.CFrame = CFrame.new(Part.Position)
+                        Indicator.CFrame = CFrame.new(Part.Position)
                     end
                 end
             end
@@ -135,81 +132,80 @@ do
 
     print("click connection loaded")
 
-    V.LoadPreview = V.PositionSettings:addButton("Load Model", function()
-        if V.Indicator and V.Build then
-            if V.Build.Model then
-                V.Indicator.Parent = workspace
-                V.Build.Model:Destroy()
+    PositionSettings:addButton("Load Model", function()
+        if Indicator and Flags.Build then
+            if Flags.Build.Model then
+                Indicator.Parent = workspace
+                Flags.Build.Model:Destroy()
             end
 
-            V.ChangingPosition = false
-            V.PositionSettings:updateToggle(V.ChangePositionToggle, "Change Position", false)
-            V.Build:Init()
+            Flags.ChangingPosition = false
+            --PositionSettings:updateToggle(GlobalToggles.ChangePositionToggle, "Change Position", false)
+            Toggle()
 
-            V.Build:SetVisibility(V.Visibility)
-            V.Build:Render(V.ShowPreview)
-
-            print('rendering it')
-            local Box = V.Build.Model:GetBoundingBox()
-            V.Build:SetCFrame(V.Indicator.CFrame)    
+            Flags.Build:Init()
+            Flags.Build:SetVisibility(Flags.Visibility)
+            Flags.Build:Render(Flags.ShowPreview)
+            Flags.Build:SetCFrame(Indicator.CFrame)    
             
-            V.Indicator.Parent = V.Build.Model
-            V.Build.Model.PrimaryPart = V.Indicator
+            Indicator.Parent = Flags.Build.Model
+            Flags.Build.Model.PrimaryPart = Indicator
         end
     end)
 
     print("load preview button loaded")
 
-    V.Rotate = Build:addSection("Rotation")
-    V.XRotate = V.Rotate:addButton("Rotate on X", function()
-        if V.Build then
-            V.Build:SetCFrame(V.Indicator.CFrame * CFrame.Angles(math.rad(90), 0, 0))
+    local Rotate = Build:addSection("Rotation")
+
+    Rotate:addButton("Rotate on X", function()
+        if Flags.Build then
+            Flags.Build:SetCFrame(Indicator.CFrame * CFrame.Angles(math.rad(90), 0, 0))
         end
     end)
 
-    V.YRotate = V.Rotate:addButton("Rotate on Y", function()
-        if V.Build then
-            V.Build:SetCFrame(V.Indicator.CFrame * CFrame.Angles(0, math.rad(90), 0))
+    Rotate:addButton("Rotate on Y", function()
+        if Flags.Build then
+            Flags.Build:SetCFrame(Indicator.CFrame * CFrame.Angles(0, math.rad(90), 0))
         end
     end)
 
-    V.ZRotate = V.Rotate:addButton("Rotate on Z", function()
-        if V.Build then
-            V.Build:SetCFrame(V.Indicator.CFrame * CFrame.Angles(0, 0, math.rad(90)))
+    Rotate:addButton("Rotate on Z", function()
+        if Flags.Build then
+            Flags.Build:SetCFrame(Indicator.CFrame * CFrame.Angles(0, 0, math.rad(90)))
         end
     end)
 
     print("rotation loaded")
 
-    V.BuildSection = Build:addSection("Build")
-    V.BuildSection:addToggle("Show Build", true, function(willShow)
-        V.ShowPreview = willShow
-        V.Indicator.Transparency = willShow and 0.5 or 1
+    local BuildSection = Build:addSection("Build")
+    BuildSection:addToggle("Show Build", true, function(willShow)
+        Flags.ShowPreview = willShow
+        Indicator.Transparency = willShow and 0.5 or 1
         Handles.Parent = willShow and game.CoreGui or game.ReplicatedStorage
 
-        if V.Build then
-            if V.Build.Model then
-                V.Build:Render(V.ShowPreview)
+        if Flags.Build then
+            if Flags.Build.Model then
+                Flags.Build:Render(Flags.ShowPreview)
             end
         end
     end)
 
     print("show build toggle loaded")
 
-    V.BuildSection:addTextbox("Block transparency", "0.5", function(newTransparency, lost)
+    BuildSection:addTextbox("Block transparency", "0.5", function(newTransparency, lost)
         if lost and tonumber(newTransparency) then
-            V.Visibility = tonumber(newTransparency)
-            if V.Build then
-                V.Build:SetVisibility(V.Visibility)
+            Flags.Visibility = tonumber(newTransparency)
+            if Flags.Build then
+                Flags.Build:SetVisibility(Flags.Visibility)
             end
         end
     end)
 
     print("dropdown loaded")
-    V.BuildSection:addButton("Start Building", function()
-        if V.Build and V.Build.Model then
+    BuildSection:addButton("Start Building", function()
+        if Flags.Build and Flags.Build.Model then
             local OriginalPosition = Player.Character.HumanoidRootPart.CFrame
-            V.Build:Build({
+            Flags.Build:Build({
                 Start = function()
                     Velocity = Instance.new("BodyVelocity", Player.Character.HumanoidRootPart)
                     Velocity.Velocity = Vector3.new(0, 0, 0)
@@ -229,9 +225,9 @@ do
 
     print("start build button loaded")
 
-    V.BuildSection:addButton("Abort", function()
-        if V.Build then
-            V.Build.Abort = true
+    BuildSection:addButton("Abort", function()
+        if Flags.Build then
+            Flags.Build.Abort = true
         end
     end)
 end
@@ -239,143 +235,145 @@ end
 print("build section done")
 
 do
-    local Http = game.HttpService
     local round = math.round
     local Save = Schematica:addPage("Save Builds")
 
-    local V = {}
-    V.Connections = {}
-    V.ChangeStart = false
-    V.ChangeEnd = false
-    V.ShowOutline = true
-    V.BuildName = "Untitled"
-    V.Private = "Public"
+    local Flags = {
+        ChangeStart = false,
+        ChangeEnd = false,
+        ShowOutline = true,
+        BuildName = "Untitled",
+        Private = "Public",
+        CF1 = 0,
+        CF2 = 0
+    }
 
-    V.Points = Save:addSection("Set Points")
+    local Points = Save:addSection("Set Points")
 
-    V.Point1 = V.Points:addToggle("Change Start Point", false, function(willChange)
-        V.ChangeStart = willChange
+    GlobalToggles.SavePoint1 = Points:addToggle("Change Start Point", false, function(willChange)
+        Flags.ChangeStart = willChange
         if willChange then
-            V.Points:updateToggle(V.Point2, "Change End Point", false)
-            V.ChangeEnd = false
+            Toggle("SavePoint1")
+            --Points:updateToggle(GlobalToggles.SavePoint2, "Change End Point", false)
+            Flags.ChangeEnd = false
         end
     end)
 
-    V.Point2 = V.Points:addToggle("Change End Point", false, function(willChange)
-        V.ChangeEnd = willChange
+    GlobalToggles.SavePoint2 = Points:addToggle("Change End Point", false, function(willChange)
+        Flags.ChangeEnd = willChange
         if willChange then
-            V.Points:updateToggle(V.Point1, "Change Start Point", false)
-            V.ChangeStart = false
+            Toggle("SavePoint2")
+            --Points:updateToggle(GlobalToggles.SavePoint1, "Change Start Point", false)
+            Flags.ChangeStart = false
         end
     end)
 
     print("points loaded")
 
-    V.Model = Instance.new("Model")
+    local Model = Instance.new("Model")
 
     local SelectionBox = Instance.new("SelectionBox")
-    SelectionBox.Adornee = V.Model
+    SelectionBox.Adornee = Model
     SelectionBox.SurfaceColor3 = Color3.new(1, 0, 0)
     SelectionBox.Color3 = Color3.new(1, 1, 1)
-    SelectionBox.Parent = V.Model
     SelectionBox.LineThickness = 0.1
     SelectionBox.SurfaceTransparency = 0.8
     SelectionBox.Visible = false
+    SelectionBox.Parent = Model
 
-    V.IndicatorStart = Instance.new("Part")
-    V.IndicatorStart.Size = Vector3.new(3.1, 3.1, 3.1)
-    V.IndicatorStart.Transparency = 1
-    V.IndicatorStart.Anchored = true
-    V.IndicatorStart.CanCollide = false
-    V.IndicatorStart.BrickColor = BrickColor.new("Really red")
-    V.IndicatorStart.Material = "Plastic"
-    V.IndicatorStart.TopSurface = Enum.SurfaceType.Smooth
-    V.IndicatorStart.Parent = V.Model
+    local IndicatorStart = Instance.new("Part")
+    IndicatorStart.Size = Vector3.new(3.1, 3.1, 3.1)
+    IndicatorStart.Transparency = 1
+    IndicatorStart.Anchored = true
+    IndicatorStart.CanCollide = false
+    IndicatorStart.BrickColor = BrickColor.new("Really red")
+    IndicatorStart.Material = "Plastic"
+    IndicatorStart.TopSurface = Enum.SurfaceType.Smooth
+    IndicatorStart.Parent = Model
 
-    V.IndicatorEnd = Instance.new("Part")
-    V.IndicatorEnd.Size = Vector3.new(3.1, 3.1, 3.1)
-    V.IndicatorEnd.Transparency = 1
-    V.IndicatorEnd.Anchored = true
-    V.IndicatorEnd.CanCollide = false
-    V.IndicatorEnd.BrickColor = BrickColor.new("Really blue")
-    V.IndicatorEnd.Material = "Plastic"
-    V.IndicatorEnd.TopSurface = Enum.SurfaceType.Smooth
-    V.IndicatorEnd.Parent = V.Model
+    local IndicatorEnd = Instance.new("Part")
+    IndicatorEnd.Size = Vector3.new(3.1, 3.1, 3.1)
+    IndicatorEnd.Transparency = 1
+    IndicatorEnd.Anchored = true
+    IndicatorEnd.CanCollide = false
+    IndicatorEnd.BrickColor = BrickColor.new("Really blue")
+    IndicatorEnd.Material = "Plastic"
+    IndicatorEnd.TopSurface = Enum.SurfaceType.Smooth
+    IndicatorEnd.Parent = Model
 
     local StartHandles = Instance.new("Handles")
 
     StartHandles.Style = Enum.HandlesStyle.Movement
-    StartHandles.Adornee = V.IndicatorStart
+    StartHandles.Adornee = IndicatorStart
     StartHandles.Visible = false
     StartHandles.Parent = game.CoreGui
 
     local EndHandles = Instance.new("Handles")
 
     EndHandles.Style = Enum.HandlesStyle.Movement
-    EndHandles.Adornee = V.IndicatorEnd
+    EndHandles.Adornee = IndicatorEnd
     EndHandles.Visible = false
     EndHandles.Parent = game.CoreGui
 
     print("instances loaded")
 
-    V.CF1 = 0
-    V.CF2 = 0
-
-    V.Connections.StartHandleDown = StartHandles.MouseButton1Down:Connect(function()
-        V.CF1 = StartHandles.Adornee.CFrame
+    StartHandles.MouseButton1Down:Connect(function()
+        Flags.CF1 = StartHandles.Adornee.CFrame
     end)
 
-    V.Connections.StartHandleDrag = StartHandles.MouseDrag:Connect(function(Face, Distance)
-        StartHandles.Adornee.CFrame = V.CF1 + Vector3.FromNormalId(Face) * (round(Distance / 3) * 3)
+    StartHandles.MouseDrag:Connect(function(Face, Distance)
+        StartHandles.Adornee.CFrame = Flags.CF1 + Vector3.FromNormalId(Face) * (round(Distance / 3) * 3)
     end)
 
-    V.Connections.EndHandleDown = EndHandles.MouseButton1Down:Connect(function()
-        V.CF2 = EndHandles.Adornee.CFrame
+    EndHandles.MouseButton1Down:Connect(function()
+        Flags.CF2 = EndHandles.Adornee.CFrame
     end)
 
-    V.Connections.EndHandleDrag = EndHandles.MouseDrag:Connect(function(Face, Distance)
-        EndHandles.Adornee.CFrame = V.CF2 + Vector3.FromNormalId(Face) * (round(Distance / 3) * 3)
+    EndHandles.MouseDrag:Connect(function(Face, Distance)
+        EndHandles.Adornee.CFrame = Flags.CF2 + Vector3.FromNormalId(Face) * (round(Distance / 3) * 3)
     end)
 
     print("connections loaded")
 
-    V.Model.Parent = workspace
+    Model.Parent = workspace
     
-    V.Points:addToggle("Show Outline", true, function(willShow)
-        V.ShowOutline = willShow
-        V.IndicatorStart.Transparency = willShow and 0.5 or 1
-        V.IndicatorEnd.Transparency = willShow and 0.5 or 1
-        V.Model.Parent = willShow and workspace or game.ReplicatedStorage
+    Points:addToggle("Show Outline", true, function(willShow)
+        Flags.ShowOutline = willShow
+
+        IndicatorStart.Transparency = willShow and 0.5 or 1
+        IndicatorEnd.Transparency = willShow and 0.5 or 1
         StartHandles.Visible = willShow
         EndHandles.Visible = willShow
+
+        Model.Parent = willShow and workspace or game.ReplicatedStorage
     end)
 
-    V.Connections.Click = Mouse.Button1Down:Connect(function()
+     Mouse.Button1Down:Connect(function()
         if Mouse.Target then
-            if V.ChangeStart or V.ChangeEnd then
-                local ToChange = V.ChangeStart and "Start" or "End"
+            if Flags.ChangeStart or Flags.ChangeEnd then
+                local ToChange = Flags.ChangeStart and "Start" or "End"
                 if Mouse.Target.Parent.Name == "Blocks" or Mouse.Target.Parent.Parent.Name == "Blocks" then
                     local Part = Mouse.Target.Parent.Name == "Blocks" and Mouse.Target or Mouse.Target.Parent.Parent.Name == "Blocks" and Mouse.Target.Parent
-                    V[ToChange] = Part.Position
+                    Flags[ToChange] = Part.Position
 
                     if ToChange == "Start" then
-                        StartHandles.Visible =  V.ShowOutline
-                        V.IndicatorStart.Transparency = V.ShowOutline and 0.5 or 1
+                        StartHandles.Visible =  Flags.ShowOutline
+                        IndicatorStart.Transparency = Flags.ShowOutline and 0.5 or 1
                     elseif ToChange == "End" then
-                        EndHandles.Visible =  V.ShowOutline
-                        V.IndicatorEnd.Transparency = V.ShowOutline and 0.5 or 1
+                        EndHandles.Visible =  Flags.ShowOutline
+                        IndicatorEnd.Transparency = Flags.ShowOutline and 0.5 or 1
                     end
 
-                    if V.Start and V.End then
-                        SelectionBox.Visible =  V.ShowOutline
+                    if Flags.Start and Flags.End then
+                        SelectionBox.Visible =  Flags.ShowOutline
                         if ToChange == "Start" then
-                            V.IndicatorStart.Position = Part.Position
+                            IndicatorStart.Position = Part.Position
                         elseif ToChange == "End" then
-                            V.IndicatorEnd.Position = Part.Position
+                            IndicatorEnd.Position = Part.Position
                         end
                     else
-                        V.IndicatorStart.Position = Part.Position
-                        V.IndicatorEnd.Position = Part.Position
+                        IndicatorStart.Position = Part.Position
+                        IndicatorEnd.Position = Part.Position
                     end
                 end
             end
@@ -383,35 +381,35 @@ do
     end)
 
     print("click con added")
-    V.Final = Save:addSection("Save")
+    local Final = Save:addSection("Save")
 
-    V.Final:addTextbox("Custom Name", "", function(name)
-        V.BuildName = name
+    Final:addTextbox("Custom Name", "", function(name)
+        Flags.BuildName = name
     end)
 
-    V.Final:addToggle("Unlisted", false, function(isPrivate)
-        V.Private = isPrivate and "Private" or "Public"
+    Final:addToggle("Unlisted", false, function(isPrivate)
+        Flags.Private = isPrivate and "Private" or "Public"
     end)
 
-    V.Final:addButton("Save Area", function()
-        local Serialize = Serializer.new(V.IndicatorStart.Position, V.IndicatorEnd.Position)
+    Final:addButton("Save Area", function()
+        local Serialize = Serializer.new(IndicatorStart.Position, IndicatorEnd.Position)
         local Data = Serialize:Serialize()
 
-        local Response = req({
-            Url = env.post;
+        local Response = Fetch({
+            Url = Env.post;
             Body = game.HttpService:JSONEncode(Data);
             Headers = {
                 ["Content-Type"] = "application/json",
-                ["Build-Name"] = V.BuildName == "" and "Untitled" or V.BuildName;
-                Private = V.Private
+                ["Build-Name"] = Flags.BuildName == "" and "Untitled" or Flags.BuildName;
+                ["Private"] = Flags.Private
             };
             Method = "POST"
         })
 
         local JSONResponse = Http:JSONDecode(Response.Body)
         if JSONResponse.status == "success" then
-            setclipboard(JSONResponse.output)
             writefile("builds/" .. JSONResponse.output .. ".s", game.HttpService:JSONEncode(Data))
+            setclipboard(JSONResponse.output)
             Schematica:Notify("Build Uploaded", "Copied to clipboard")
         else
             Schematica:Notify("Error", JSONResponse.status)
@@ -426,154 +424,155 @@ do
 
     local round = math.round
     
-    local V = {}
-    V.Connections = {}
-    V.ChangeStart = false
-    V.ChangeEnd = false
-    V.ShowOutline = true
+    local Flags = {
+        ChangeStart = false,
+        ChangeEnd = false,
+        ShowOutline = true,
+        CF1 = 0,
+        CF2 = 0
+    }
 
-    V.SetPoints = Print:addSection("Set Points")
-    V.ChangeStartToggle = V.SetPoints:addToggle("Change Start Point", false, function(willChange)
-        V.ChangeStart = willChange
+    local SetPoints = Print:addSection("Set Points")
+    GlobalToggles.PrinterStart = SetPoints:addToggle("Change Start Point", false, function(willChange)
+        Flags.ChangeStart = willChange
         if willChange then
-            V.ChangeEnd = false
-            V.SetPoints:updateToggle(V.ChangeEndToggle, "Change End Point", false)
+            Flags.ChangeEnd = false
+            Toggle("PrinterStart")
+            --SetPoints:updateToggle(GlobalToggles.PrinterEnd, "Change End Point", false)
         end
     end)
 
-    V.ChangeEndToggle = V.SetPoints:addToggle("Change End Point", false, function(willChange)
-        V.ChangeEnd = willChange
+    GlobalToggles.PrinterEnd = SetPoints:addToggle("Change End Point", false, function(willChange)
+        Flags.ChangeEnd = willChange
         if willChange then
-            V.ChangeStart = false
-            V.SetPoints:updateToggle(V.ChangeStartToggle, "Change Start Point", false)
+            Flags.ChangeStart = false
+            Toggle("PrinterEnd")
+            --SetPoints:updateToggle(GlobalToggles.PrinterStart, "Change Start Point", false)
         end
     end)
 
-    V.Model = Instance.new("Model")
+    local Model = Instance.new("Model")
 
     local SelectionBox = Instance.new("SelectionBox")
-    SelectionBox.Adornee = V.Model
     SelectionBox.SurfaceColor3 = Color3.new(0, 1, 0)
     SelectionBox.Color3 = Color3.new(1, 1, 1)
-    SelectionBox.Parent = V.Model
     SelectionBox.LineThickness = 0.1
     SelectionBox.SurfaceTransparency = 0.8
     SelectionBox.Visible = false
+    SelectionBox.Adornee = Model
+    SelectionBox.Parent = Model
 
-    V.IndicatorStart = Instance.new("Part")
-    V.IndicatorStart.Size = Vector3.new(3.1, 3.1, 3.1)
-    V.IndicatorStart.Transparency = 1
-    V.IndicatorStart.Anchored = true
-    V.IndicatorStart.CanCollide = false
-    V.IndicatorStart.BrickColor = BrickColor.new("Really red")
-    V.IndicatorStart.Material = "Plastic"
-    V.IndicatorStart.TopSurface = Enum.SurfaceType.Smooth
-    V.IndicatorStart.Parent = V.Model
+    local IndicatorStart = Instance.new("Part")
+    IndicatorStart.Size = Vector3.new(3.1, 3.1, 3.1)
+    IndicatorStart.Transparency = 1
+    IndicatorStart.Anchored = true
+    IndicatorStart.CanCollide = false
+    IndicatorStart.BrickColor = BrickColor.new("Really red")
+    IndicatorStart.Material = "Plastic"
+    IndicatorStart.TopSurface = Enum.SurfaceType.Smooth
+    IndicatorStart.Parent = Model
 
-    V.IndicatorEnd = Instance.new("Part")
-    V.IndicatorEnd.Size = Vector3.new(3.1, 3.1, 3.1)
-    V.IndicatorEnd.Transparency = 1
-    V.IndicatorEnd.Anchored = true
-    V.IndicatorEnd.CanCollide = false
-    V.IndicatorEnd.BrickColor = BrickColor.new("Really blue")
-    V.IndicatorEnd.Material = "Plastic"
-    V.IndicatorEnd.TopSurface = Enum.SurfaceType.Smooth
-    V.IndicatorEnd.Parent = V.Model
+    local IndicatorEnd = Instance.new("Part")
+    IndicatorEnd.Size = Vector3.new(3.1, 3.1, 3.1)
+    IndicatorEnd.Transparency = 1
+    IndicatorEnd.Anchored = true
+    IndicatorEnd.CanCollide = false
+    IndicatorEnd.BrickColor = BrickColor.new("Really blue")
+    IndicatorEnd.Material = "Plastic"
+    IndicatorEnd.TopSurface = Enum.SurfaceType.Smooth
+    IndicatorEnd.Parent = Model
 
     local StartHandles = Instance.new("Handles")
 
     StartHandles.Style = Enum.HandlesStyle.Movement
-    StartHandles.Adornee = V.IndicatorStart
     StartHandles.Visible = false
+    StartHandles.Adornee = IndicatorStart
     StartHandles.Parent = game.CoreGui
 
     local EndHandles = Instance.new("Handles")
 
     EndHandles.Style = Enum.HandlesStyle.Movement
-    EndHandles.Adornee = V.IndicatorEnd
     EndHandles.Visible = false
+    EndHandles.Adornee = IndicatorEnd
     EndHandles.Parent = game.CoreGui
 
-    V.DragCF1 = 0
-    V.DragCF2 = 0
+    Model.Parent = workspace
 
-    V.Connections.StartHandleDown = StartHandles.MouseButton1Down:Connect(function()
-        V.DragCF1 = StartHandles.Adornee.CFrame
+    StartHandles.MouseButton1Down:Connect(function()
+        Flags.CF1 = StartHandles.Adornee.CFrame
     end)
 
-    V.Connections.StartHandleDrag = StartHandles.MouseDrag:Connect(function(Face, Distance)
-        StartHandles.Adornee.CFrame = V.DragCF1 + Vector3.FromNormalId(Face) * (round(Distance / 3) * 3)
+    StartHandles.MouseDrag:Connect(function(Face, Distance)
+        StartHandles.Adornee.CFrame = Flags.CF1 + Vector3.FromNormalId(Face) * (round(Distance / 3) * 3)
     end)
 
-    V.Connections.EndHandleDown = EndHandles.MouseButton1Down:connect(function()
-        V.DragCF2 = EndHandles.Adornee.CFrame
+    EndHandles.MouseButton1Down:Connect(function()
+        Flags.CF2 = EndHandles.Adornee.CFrame
     end)
 
-    V.Connections.EndHandleDrag = EndHandles.MouseDrag:Connect(function(Face, Distance)
-        EndHandles.Adornee.CFrame = V.DragCF2 + Vector3.FromNormalId(Face) * (round(Distance / 3) * 3)
+    EndHandles.MouseDrag:Connect(function(Face, Distance)
+        EndHandles.Adornee.CFrame = Flags.CF2 + Vector3.FromNormalId(Face) * (round(Distance / 3) * 3)
     end)
 
-    V.Model.Parent = workspace
-
-    V.Connections.Click = Mouse.Button1Down:Connect(function()
+    Mouse.Button1Down:Connect(function()
         if Mouse.Target then
-            if V.ChangeStart or V.ChangeEnd then
-                local ToChange = V.ChangeStart and "Start" or "End"
+            if Flags.ChangeStart or Flags.ChangeEnd then
+                local ToChange = Flags.ChangeStart and "Start" or "End"
                 if Mouse.Target.Parent.Name == "Blocks" or Mouse.Target.Parent.Parent.Name == "Blocks" then
                     local Part = Mouse.Target.Parent.Name == "Blocks" and Mouse.Target or Mouse.Target.Parent.Parent.Name == "Blocks" and Mouse.Target.Parent
-                    V[ToChange] = Part.Position
+                    Flags[ToChange] = Part.Position
 
                     if ToChange == "Start" then
-                        StartHandles.Visible =  V.ShowOutline
-                        V.IndicatorStart.Transparency = V.ShowOutline and 0.5 or 1
+                        StartHandles.Visible =  Flags.ShowOutline
+                        IndicatorStart.Transparency = Flags.ShowOutline and 0.5 or 1
                     elseif ToChange == "End" then
-                        EndHandles.Visible =  V.ShowOutline
-                        V.IndicatorEnd.Transparency = V.ShowOutline and 0.5 or 1
+                        EndHandles.Visible =  Flags.ShowOutline
+                        IndicatorEnd.Transparency = Flags.ShowOutline and 0.5 or 1
                     end
 
-                    if V.Start and V.End then
-                        SelectionBox.Visible =  V.ShowOutline
+                    if Flags.Start and Flags.End then
+                        SelectionBox.Visible =  Flags.ShowOutline
                         if ToChange == "Start" then
-                            V.IndicatorStart.Position = Part.Position
+                            IndicatorStart.Position = Part.Position
                         elseif ToChange == "End" then
-                            V.IndicatorEnd.Position = Part.Position
+                            IndicatorEnd.Position = Part.Position
                         end
                     else
-                        V.IndicatorStart.Position = Part.Position
-                        V.IndicatorEnd.Position = Part.Position
+                        IndicatorStart.Position = Part.Position
+                        IndicatorEnd.Position = Part.Position
                     end
                 end
             end
         end
     end)
 
-    V.Final = Print:addSection("Build")
-    V.Final:addToggle("Show Outline", true, function(willShow)
-        V.ShowOutline = willShow
-        V.IndicatorStart.Transparency = willShow and 0.5 or 1
-        V.IndicatorEnd.Transparency = willShow and 0.5 or 1
+    local Final = Print:addSection("Build")
+    Final:addToggle("Show Outline", true, function(willShow)
+        Flags.ShowOutline = willShow
+        IndicatorStart.Transparency = willShow and 0.5 or 1
+        IndicatorEnd.Transparency = willShow and 0.5 or 1
 
-        if V.Start then
+        if Flags.Start then
             StartHandles.Visible = willShow
         end
 
-        if V.End then
+        if Flags.End then
             EndHandles.Visible = willShow
         end
 
         SelectionBox.Visible = willShow
     end)
 
-    V.Final:addButton("Print Area", function()
-        if V.Start and V.End then
+    Final:addButton("Print Area", function()
+        if Flags.Start and Flags.End then
             if Player.Character:FindFirstChildOfClass("Tool") then
                 local OriginalPosition = Player.Character.HumanoidRootPart.CFrame
-    
-                V.Printing = Printer.new(V.IndicatorStart.Position, V.IndicatorEnd.Position)
-    
                 local BlockType = Player.Character:FindFirstChildOfClass("Tool").Name:gsub("Seeds", "")
-                V.Printing:SetBlock(BlockType)
-                V.Printing:Build({
+
+                Flags.Printing = Printer.new(IndicatorStart.Position, IndicatorEnd.Position)
+                Flags.Printing:SetBlock(BlockType)
+
+                Flags.Printing:Build({
                     Start = function()
                         Velocity = Instance.new("BodyVelocity", Player.Character.HumanoidRootPart)
                         Velocity.Velocity = Vector3.new(0, 0, 0)
@@ -594,10 +593,11 @@ do
         end
     end)
 
-    V.Final:addButton("Destroy Area", function()
+    Final:addButton("Destroy Area", function()
         local OriginalPosition = Player.Character.HumanoidRootPart.CFrame
-        V.Printing = Printer.new(V.IndicatorStart.Position, V.IndicatorEnd.Position)
-        V.Printing:Reverse({
+        Flags.Printing = Printer.new(IndicatorStart.Position, IndicatorEnd.Position)
+
+        Flags.Printing:Reverse({
             Start = function()
                 Velocity = Instance.new("BodyVelocity", Player.Character.HumanoidRootPart)
                 Velocity.Velocity = Vector3.new(0, 0, 0)
@@ -612,55 +612,36 @@ do
         })
     end)
 
-    V.Final:addButton("Abort", function()
-        V.Printing.Abort = true
+    Final:addButton("Abort", function()
+        Flags.Printing.Abort = true
     end)
 end
 
 do
-    local function closestIsland() local L_6_ = workspace:WaitForChild("Islands"):GetChildren() local L_7_ = Player.Character.HumanoidRootPart.Position for L_8_forvar0 = 1, #L_6_ do local L_9_ = L_6_[L_8_forvar0] if L_9_:FindFirstChild("Root") and math.abs(L_9_.PrimaryPart.Position.X - L_7_.X) <= 1000 and math.abs(L_9_.PrimaryPart.Position.Z - L_7_.Z) <= 1000 then return L_9_ end end return workspace.Islands:FindFirstChild(tostring(Player.UserId).."-island") end
-
     local Players = game.Players
- 
-    local cache = {}
-    local function getUsernameFromUserId(userId)
-        if cache[userId] then return cache[userId] end
-        local player = Players:GetPlayerByUserId(userId)
-        if player then
-            cache[userId] = player.Name
-            return player.Name
-        end 
-        local name
-        pcall(function ()
-            name = Players:GetNameFromUserIdAsync(userId)
-        end)
-        cache[userId] = name
-        return name
-    end
+    local Cache = {}
 
-    local Http = game.HttpService
+    local function closestIsland()local b=workspace:WaitForChild("Islands"):GetChildren()local c=Player.Character.HumanoidRootPart.Position for d=1,#b do local b=b[d]if b:FindFirstChild("Root")and math.abs(b.PrimaryPart.Position.X-c.X)<=1000 and math.abs(b.PrimaryPart.Position.Z-c.Z)<=1000 then return b end end return workspace.Islands:FindFirstChild(tostring(Player.UserId).."-island")end
+    local function getUsernameFromUserId(b)if Cache[b]then return Cache[b]end local c=Players:GetPlayerByUserId(b)if c then Cache[b]=c.Name return c.Name end local c pcall(function()c=Players:GetNameFromUserIdAsync(b)end)Cache[b]=c return c end
+    local function strArray(b)local c={}for b,d in next,b do c[b]=tonumber(d)end return c end
+
     local Other = Schematica:addPage("File Stuff")
     local ConvertOldSection = Other:addSection("Convert Old Build")
 
-    local V = {}
-    V.Private = "Public"
+    local Flags = {
+        Private = false,
+        File = "",
+        ToUpload = "",
+        UploadPrivate = false
+    }
+
     ConvertOldSection:addTextbox("File", "", function(File)
-        V.File = File
+        Flags.File = File .. ".s"
     end)
-
-    local function strArray(a)
-        local b = {}
-
-        for i, v in next, a do
-            b[i] = tonumber(v)
-        end
-
-        return b
-    end
 
     local ClosestIslandSave = Other:addSection("Save Closest Island")
     ClosestIslandSave:addToggle("Unlisted", false, function(isPrivate)
-        V.Private = isPrivate and "Private" or "Public"
+        Flags.Private = isPrivate
     end)
 
     ClosestIslandSave:addButton("Save", function()
@@ -672,30 +653,31 @@ do
             local Serialize = Serializer.new(Center.Position - Size / 2, Center.Position + Size / 2)
             local Data = Serialize:Serialize()
 
-            local Response = req({
-                Url = env.post;
+            local Response = Fetch({
+                Url = Env.post;
                 Body = game.HttpService:JSONEncode(Data);
                 Headers = {
                     ["Content-Type"] = "application/json";
                     ["Build-Name"] = Username .. "'s Island";
-                    ["Private"] = V.Private;
+                    ["Private"] = Flags.Private and "Private" or "Public";
                 };
                 Method = "POST"
             })
 
             local JSONResponse = Http:JSONDecode(Response.Body)
             if JSONResponse.status == "success" then
-                setclipboard(JSONResponse.output)
                 writefile("builds/" .. JSONResponse.output .. ".s", game.HttpService:JSONEncode(Data))
+                setclipboard(JSONResponse.output)
                 Schematica:Notify("Build Uploaded", "Copied to clipboard")
             else
                 Schematica:Notify("Error", JSONResponse.status)
             end
         end
     end)
+
     ConvertOldSection:addButton("Convert", function()
-        if isfile("builds/" .. V.File) then
-            local Data = Http:JSONDecode(readfile("builds/" .. V.File))
+        if isfile("builds/" .. Flags.File) then
+            local Data = Http:JSONDecode(readfile("builds/" .. Flags.File))
             local Output = {}
             Output.Blocks = {}
 
@@ -732,7 +714,7 @@ do
 
             Output.Size = {HighX - LowX, HighY - LowY, HighZ - LowZ}
 
-            local FileName = V.File .. "-converted-" .. tostring(os.time())
+            local FileName = Flags.File .. "-" .. tostring(os.time())
             writefile(string.format("builds/%s", FileName) .. ".s", Http:JSONEncode(Output))
             setclipboard(FileName)
             Schematica:Notify("Converted!", "Saved file as " .. FileName)
@@ -741,26 +723,30 @@ do
 
     local UploadFile = Other:addSection("Upload File")
     UploadFile:addTextbox("File", "", function(File)
-        V.ToUpload = File
+        Flags.ToUpload = File .. ".s"
+    end)
+
+    UploadFile:addToggle("Unlisted", false, function(isPrivate)
+        Flags.UploadPrivate = isPrivate
     end)
 
     UploadFile:addButton("Upload", function()
-        if isfile("builds/" .. V.ToUpload) then
-            local Response = req({
-                Url = env.post;
-                Body = readfile("builds/" .. V.ToUpload);
+        if isfile("builds/" .. Flags.ToUpload) then
+            local Response = Fetch({
+                Url = Env.post;
+                Body = readfile("builds/" .. Flags.ToUpload);
                 Headers = {
                     ["Content-Type"] = "application/json",
-                    ["Build-Name"] = V.ToUpload:gsub("%.(.+)", "");
-                    Private = "Public"
+                    ["Build-Name"] = Flags.ToUpload:gsub("%.(.+)", ""),
+                    ["Private"] = UploadPrivate and "Private" or "Public"
                 };
                 Method = "POST"
             })
 
             local JSONResponse = Http:JSONDecode(Response.Body)
             if JSONResponse.status == "success" then
-                setclipboard(JSONResponse.output)
                 writefile("builds/" .. JSONResponse.output, game.HttpService:JSONEncode(Data))
+                setclipboard(JSONResponse.output)
                 Schematica:Notify("Build Uploaded", "Copied to clipboard")
             else
                 Schematica:Notify("Error", JSONResponse.status)
@@ -770,60 +756,51 @@ do
 end
 
 do
-    local function getDisplayName(name)
-        for i, v in pairs(game.ReplicatedStorage.Tools:GetChildren()) do
-            if v.Name:lower() == name:lower() and v:FindFirstChild("DisplayName") then
-                return v:FindFirstChild("DisplayName").Value
-            end
-        end
-    end
+    local function getDisplayName(b)for c,c in pairs(game.ReplicatedStorage.Tools:GetChildren())do if c.Name:lower()==b:lower()and c:FindFirstChild("DisplayName")then return c:FindFirstChild("DisplayName").Value end end end
 
     local Utilities = Schematica:addPage("Utilities")
     local RequiredMats = Utilities:addSection("View Required Materials")
 
-    local V = {
-        Id = ""
+    local Flags = {
+        Id = "0"
     }
 
-    RequiredMats:addTextbox("Build ID", "", function(Id)
-        V.Id = Id
+    RequiredMats:addTextbox("Build ID", "0", function(Id)
+        Flags.Id = Id
     end)
 
-    local currentElements = {}
+    local CurrentLabels = {}
 
-    local materials = Utilities:addSection("Materials")
+    local Materials = Utilities:addSection("Materials")
     RequiredMats:addButton("View Materials", function()
-        if isfile("builds/" .. V.Id .. ".s") then
-            local Data = Http:JSONDecode(readfile("builds/" .. V.Id .. ".s"))
+        if isfile("builds/" .. Flags.Id .. ".s") then
+            local Data = Http:JSONDecode(readfile("builds/" .. Flags.Id .. ".s"))
 
-            for i, v in next, currentElements do
-                table.remove(materials.modules, table.find(materials.modules, v))
+            for i, v in next, CurrentLabels do
+                table.remove(Materials.modules, table.find(Materials.modules, v))
                 v:Destroy()
             end
 
-            materials:Resize()
-
             for i, v in next, Data.Blocks do
-                table.insert(currentElements, materials:addLabel(getDisplayName(i) .. " : " .. #v))
+                table.insert(CurrentLabels, Materials:addLabel(getDisplayName(i) .. " : " .. #v))
             end
-            materials:Resize()
+
+            Materials:Resize()
         else
-            local Response = Http:JSONDecode(game:HttpGet(env.get .. V.Id))
+            local Response = Http:JSONDecode(game:HttpGet(Env.get .. Flags.Id))
             if Response.success == true then
                 local Data = Response.data
-                writefile("builds/" .. V.Id .. ".s", game.HttpService:JSONEncode(Response.data))
+                writefile("builds/" .. Flags.Id .. ".s", game.HttpService:JSONEncode(Data))
 
-                for i, v in next, currentElements do
-                    table.remove(materials.modules, table.find(materials.modules, v))
+                for i, v in next, CurrentLabels do
+                    table.remove(Materials.modules, table.find(Materials.modules, v))
                     v:Destroy()
                 end
 
-                materials:Resize()
-
                 for i, v in next, Data.Blocks do
-                    table.insert(currentElements, materials:addLabel(getDisplayName(i) .. " : " .. #v))
+                    table.insert(currentElements, Materials:addLabel(getDisplayName(i) .. " : " .. #v))
                 end
-                materials:Resize()
+                Materials:Resize()
             end
         end
     end)
