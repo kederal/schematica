@@ -1,6 +1,16 @@
+--[[
+    Author: Jxl
+    Description: A block printer module
+]]
+
 local Printer = {}
 
 do
+    local PLACE_BLOCK = game.ReplicatedStorage.Remotes.Functions.CLIENT_BLOCK_PLACE_REQUEST
+    local HIT_BLOCK = game.ReplicatedStorage.Remotes.Functions.CLIENT_BLOCK_HIT_REQUEST
+    local HEARTBEAT = game:GetService("RunService").Heartbeat
+    local UNBREAKABLE_GRASS_POSITION = Vector3.new(6, -6, -141)
+
     Printer.__index = Printer
 
     setmetatable(Printer, {
@@ -8,21 +18,14 @@ do
             return "Printer"
         end
     })
-
-    local Place = game.ReplicatedStorage.Remotes.Functions.CLIENT_BLOCK_PLACE_REQUEST
-    local Hit = game.ReplicatedStorage.Remotes.Functions.CLIENT_BLOCK_HIT_REQUEST
-
-    local Heartbeat = game:GetService("RunService").Heartbeat
-
+    
     function Printer.new(Start, End, Block)
-        local self = setmetatable({}, Printer)
-
-        self.Start = Start
-        self.End = End
-        self.Block = Block
-        self.Abort = false
-
-        return self
+        return setmetatable({
+            Start = Start,
+            End = End,
+            Block = Block,
+            Abort = false
+        }, Printer)
     end
 
     function Printer:SetStart(Start)
@@ -37,7 +40,7 @@ do
         self.Block = Block
     end
 
-    function Printer:IsTaken(Position) -- Private
+    function Printer:IsTaken(Position)
         local Parts = workspace:FindPartsInRegion3(Region3.new(Position, Position), nil, math.huge)
         for i, v in next, Parts do
             if v.Parent and v.Parent.Name == "Blocks" then
@@ -51,27 +54,23 @@ do
         Callback.Start()
         local Start, End = Vector3.new(math.min(self.Start.X, self.End.X), math.min(self.Start.Y, self.End.Y), math.min(self.Start.Z, self.End.Z)), Vector3.new(math.max(self.Start.X, self.End.X), math.max(self.Start.Y, self.End.Y), math.max(self.Start.Z, self.End.Z))
         for X = Start.X, End.X, 3 do
-            if self.Abort then self.Abort = false break end
-
             for Y = Start.Y, End.Y, 3 do
-                if self.Abort then self.Abort = false break end
-
                 for Z = Start.Z, End.Z, 3 do
-                    if self.Abort then self.Abort = false break end
+                    if self.Abort then return end
 
                     local Position = Vector3.new(X, Y, Z)
                     Callback.Build(Position)
 
                     if not self:IsTaken(Position) then
                         spawn(function()
-                            Place:InvokeServer({
+                            PLACE_BLOCK:InvokeServer({
                                 blockType = self.Block;
                                 cframe = CFrame.new(Position);
                                 player_tracking_category = "join_from_web";
                                 upperSlab = false;
                             })
                         end)
-                        Heartbeat:wait()
+                        HEARTBEAT:wait()
                     end
                 end
             end
@@ -85,7 +84,6 @@ do
         local Start, End = Vector3.new(math.min(self.Start.X, self.End.X), math.min(self.Start.Y, self.End.Y), math.min(self.Start.Z, self.End.Z)), Vector3.new(math.max(self.Start.X, self.End.X), math.max(self.Start.Y, self.End.Y), math.max(self.Start.Z, self.End.Z))
         local Region = Region3.new(Start, End)
 
-        local UnbreakableGrassPosition = Vector3.new(6, -6, -141)
         for i, v in next, workspace:FindPartsInRegion3(Region, nil, math.huge) do
             if self.Abort then 
                 self.Abort = false 
@@ -93,23 +91,20 @@ do
                 break 
             end
 
-            if v.Name ~= "bedrock" and (not v:FindFirstChild("portal-to-spawn")) and v.Parent and v.Parent.Name == "Blocks" then
-                if v.Parent.Parent.Root.CFrame:PointToObjectSpace(v.Position) ~= UnbreakableGrassPosition then
-                    --local time = os.time()
-                    repeat
-                        if v ~= nil and v:IsDescendantOf(workspace) then
-                            Callback.Build(v.Position)
-                            Hit:InvokeServer({
-                                player_tracking_category = "join_from_web";
-                                part = v;
-                                block = v;
-                                norm = v.Position;
-                                pos = Vector3.new(-1, 0, 0)
-                            })
-                        end
-                        wait()
-                    until v == nil or (not v:IsDescendantOf(workspace)) or self.Abort == true
-                end
+            if v.Name ~= "bedrock" and v.Parent.Parent.Root.CFrame:PointToObjectSpace(v.Position) ~= UNBREAKABLE_GRASS_POSITION and (not v:FindFirstChild("portal-to-spawn")) and v.Parent and v.Parent.Name == "Blocks" then
+                repeat
+                    if v ~= nil and v:IsDescendantOf(workspace) then
+                        Callback.Build(v.Position)
+                        HIT_BLOCK:InvokeServer({
+                            player_tracking_category = "join_from_web";
+                            part = v;
+                            block = v;
+                            norm = v.Position;
+                            pos = Vector3.new(-1, 0, 0)
+                        })
+                    end
+                    wait()
+                until v == nil or (not v:IsDescendantOf(workspace)) or self.Abort == true
             end
         end
 

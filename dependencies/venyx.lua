@@ -632,8 +632,12 @@ do
 		
 		self.activeNotification = close
 		
-		notification.Accept.MouseButton1Click:Connect(function()
-		
+		local connections = {}
+		connections.accept = notification.Accept.MouseButton1Click:Connect(function()
+			for i, v in next, connections do
+				v:Disconnect()
+			end
+
 			if not active then 
 				return
 			end
@@ -645,8 +649,11 @@ do
 			close()
 		end)
 		
-		notification.Decline.MouseButton1Click:Connect(function()
-		
+		connections.decline = notification.Decline.MouseButton1Click:Connect(function()
+			for i, v in next, connections do
+				v:Disconnect()
+			end
+
 			if not active then 
 				return
 			end
@@ -681,7 +688,7 @@ do
 				Text = title,
 				TextColor3 = themes.TextColor,
 				TextSize = 12,
-				TextTransparency = 0.10000000149012
+				TextTransparency = 0.1
 			})
 		})
 		
@@ -690,7 +697,7 @@ do
 		
 		local text = button.Title
 		local debounce
-		
+
 		button.MouseButton1Click:Connect(function()
 			
 			if debounce then
@@ -741,7 +748,7 @@ do
 				Text = title,
 				TextColor3 = themes.TextColor,
 				TextSize = 12,
-				TextTransparency = 0.10000000149012,
+				TextTransparency = 0.1,
 				TextXAlignment = Enum.TextXAlignment.Center
 			})
 		})
@@ -776,7 +783,7 @@ do
 				Text = title,
 				TextColor3 = themes.TextColor,
 				TextSize = 12,
-				TextTransparency = 0.10000000149012,
+				TextTransparency = 0.1,
 				TextXAlignment = Enum.TextXAlignment.Left
 			}),
 			utility:Create("ImageLabel", {
@@ -811,8 +818,11 @@ do
 		local active = default
 		self:updateToggle(toggle, nil, active)
 		
-		toggle.MouseButton1Click:Connect(function()
-			active = not active
+		local toggleModule = {}
+		toggleModule.button = toggle
+		
+		toggleModule.toggle = function(state)
+			active = state
 			self:updateToggle(toggle, nil, active)
 			
 			if callback then
@@ -820,9 +830,13 @@ do
 					self:updateToggle(toggle, ...)
 				end)
 			end
+		end
+
+		toggle.MouseButton1Click:Connect(function()
+			toggleModule.toggle(not active)
 		end)
 		
-		return toggle
+		return toggleModule
 	end
 	
 	function section:addTextbox(title, default, callback)
@@ -849,7 +863,7 @@ do
 				Text = title,
 				TextColor3 = themes.TextColor,
 				TextSize = 12,
-				TextTransparency = 0.10000000149012,
+				TextTransparency = 0.1,
 				TextXAlignment = Enum.TextXAlignment.Left
 			}),
 			utility:Create("ImageLabel", {
@@ -957,7 +971,7 @@ do
 				Text = title,
 				TextColor3 = themes.TextColor,
 				TextSize = 12,
-				TextTransparency = 0.10000000149012,
+				TextTransparency = 0.1,
 				TextXAlignment = Enum.TextXAlignment.Left
 			}),
 			utility:Create("ImageLabel", {
@@ -1062,7 +1076,7 @@ do
 				Text = title,
 				TextColor3 = themes.TextColor,
 				TextSize = 12,
-				TextTransparency = 0.10000000149012,
+				TextTransparency = 0.1,
 				TextXAlignment = Enum.TextXAlignment.Left
 			}),
 			utility:Create("ImageButton", {
@@ -1586,7 +1600,7 @@ do
 				Text = title,
 				TextColor3 = themes.TextColor,
 				TextSize = 12,
-				TextTransparency = 0.10000000149012,
+				TextTransparency = 0.1,
 				TextXAlignment = Enum.TextXAlignment.Left
 			}),
 			utility:Create("TextBox", {
@@ -1748,7 +1762,7 @@ do
 					Text = title,
 					TextColor3 = themes.TextColor,
 					TextSize = 12,
-					TextTransparency = 0.10000000149012,
+					TextTransparency = 0.1,
 					TextXAlignment = Enum.TextXAlignment.Left
 				}),
 				utility:Create("ImageButton", {
@@ -2139,6 +2153,7 @@ do
 			end
 		end
 			
+		local connections = {}
 		for i, value in pairs(list or {}) do
 			local button = utility:Create("ImageButton", {
 				Parent = dropdown.List.Frame,
@@ -2161,11 +2176,15 @@ do
 					TextColor3 = themes.TextColor,
 					TextSize = 12,
 					TextXAlignment = "Left",
-					TextTransparency = 0.10000000149012
+					TextTransparency = 0.1
 				})
 			})
 			
-			button.MouseButton1Click:Connect(function()
+			table.insert(connections, button.MouseButton1Click:Connect(function()
+				for i, v in next, connections do
+					v:Disconnect()
+				end
+
 				if callback then
 					callback(value, function(...)
 						self:updateDropdown(dropdown, ...)
@@ -2173,7 +2192,7 @@ do
 				end
 
 				self:updateDropdown(dropdown, value, nil, callback)
-			end)
+			end))
 			
 			entries = entries + 1
 		end
