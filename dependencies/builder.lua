@@ -1,34 +1,42 @@
+--[[
+    Author: Jxl
+    Description: A builder module
+]]
+
 local Builder = {}
 
 do
-    local round = math.round
+    local BLOCKS_FOLDER = game.ReplicatedStorage.Blocks
+    local PLACE_BLOCK = game.ReplicatedStorage.Remotes.Functions.CLIENT_BLOCK_PLACE_REQUEST
+    local EDIT_SIGN = game.ReplicatedStorage.Remotes.Functions.CLIENT_EDIT_SIGN
+    local PLOW_BLOCK = game.ReplicatedStorage.Remotes.Functions.CLIENT_PLOW_BLOCK_REQUEST
+
     local Player = game.Players.LocalPlayer
 
     Builder.__index = Builder
 
-    local function Round(Number) 
+    setmetatable(Builder, {
+        __tostring = function()
+            return "Builder"
+        end
+    })
+    
+    function Builder.new(Data)
+        return setmetatable({
+            Data = Data.Blocks,
+            Size = Vector3.new(Data.Size[1], Data.Size[2], Data.Size[3]),
+            Abort = false,
+            Visibility = 0.5
+        }, Builder)
+    end
+
+    function Builder:Round(Number) 
         if typeof(Number) == "number" then
-            return round(Number / 3) * 3
+            return math.round(Number / 3) * 3
         end
     end
 
-    local Blocks = game.ReplicatedStorage.Blocks
-    local Place = game.ReplicatedStorage.Remotes.Functions.CLIENT_BLOCK_PLACE_REQUEST
-    local Heartbeat = game:GetService("RunService").Heartbeat
-    local EditSign = game.ReplicatedStorage.Remotes.Functions.CLIENT_EDIT_SIGN
-    local Plow = game.ReplicatedStorage.Remotes.Functions.CLIENT_PLOW_BLOCK_REQUEST
-
-    function Builder.new(Data)
-        local self = setmetatable({}, Builder)
-        self.Data = Data.Blocks
-        self.Size = Vector3.new(Data.Size[1], Data.Size[2], Data.Size[3])
-        self.Abort = false
-        self.Visibility = 0.5
-
-        return self
-    end
-
-    function Builder:SetupBlock(Model) -- Private
+    function Builder:SetupBlock(Model)
         for i, v in next, Model:GetDescendants() do
             if v:IsA("BasePart") then
                 v.CanCollide = false
@@ -43,19 +51,19 @@ do
         local Model = Instance.new("Model")
 
         local Center = Instance.new("Part")
-        Center.Position = Vector3.new(0, 0, 0)--Vector3.new(0, - Round(self.Size.Y / 2), 0)
+        Center.Position = Vector3.new(0, 0, 0)
         Center.Size = Vector3.new(3, 3, 3)
         Center.Transparency = 1
         Center.CanCollide = false
         Center.Anchored = true
-        Center.Parent = Model
         Center.Name = "[Center]"
+        Center.Parent = Model
 
         Model.PrimaryPart = Center
 
         for Block, Array in next, self.Data do
             for i, v in next, Array do
-                local Part = Blocks[Block]:Clone()
+                local Part = BLOCKS_FOLDER[Block]:Clone()
 
                 if Part:IsA("Model") then
                     Part:SetPrimaryPartCFrame(CFrame.new(unpack(v.C)))
@@ -77,6 +85,7 @@ do
                 end
 
                 Part.Parent = Model
+
                 self:SetupBlock(Part)
             end
         end
@@ -116,9 +125,9 @@ do
         return false
     end
 
-    function Builder:Place(Args)
-        Place:InvokeServer(Args)
-        if Args.blockType:find("sign") or Args.blockType == "soil" then
+    function Builder:Place(Args, Listen)
+        PLACE_BLOCK:InvokeServer(Args)
+        if Listen then
             local Region = Region3.new(Args.cframe.Position, Args.cframe.Position)
             for i, v in next, workspace:FindPartsInRegion3(Region) do
                 if v.Name == Args.blockType and v.Parent and v.Parent.Name == "Blocks" then
@@ -132,7 +141,7 @@ do
         Callback.Start()
         for i, v in next, self.Model:GetChildren() do
             local Name = ((v.Name == "soil" or v.Name == "dirt") and "grass") or v.Name
-            local Part = v:IsA("Model") and v.PrimaryPart or v:IsA("BasePart") and v
+            local Part = v.ClassName == "Model" and v.PrimaryPart or v:IsA("BasePart") and v
             if not self:IsTaken(Part.Position, v.Name) then 
                 if self.Abort then
                     self.Abort = false
@@ -141,22 +150,26 @@ do
                     if Name ~= "[Center]" then
                         Callback.Build(Part.CFrame)
                         spawn(function()
+                            local TextBox = v:FindFirstChild("TextBox", true)
+                            local Bottom = v:FindFirstChild("bottom", true)
+
                             local Block = self:Place({
                                 blockType = Name;
                                 cframe = Part.CFrame;
                                 player_tracking_category = "join_from_web";
-                                upperSlab = v:FindFirstChild("bottom", true) and v:FindFirstChild("bottom", true).Transparency == 1;
-                            })
-                            if Block and v:FindFirstChild("TextBox", true) and Part:FindFirstChild("TextBox", true).Text ~= "" then
-                                EditSign:InvokeServer({
+                                upperSlab = Bottom and Bottom.Transparency == 1;
+                            }, v.Name == "soil" or TextBox)
+                            
+                            if Block and TextBox and TextBox.Text ~= "" then
+                                EDIT_SIGN:InvokeServer({
                                     sign = Block;
-                                    text = Part:FindFirstChild("TextBox", true).Text
+                                    text = TextBox.Text
                                 })
                             elseif Block and v.Name == "soil" then
                                 local Tool = Player.Backpack:FindFirstChild("plow") or Player.Character:FindFirstChild("plow")
                                 if Tool then
                                     Player.Character.Humanoid:EquipTool(Tool)
-                                    Plow:InvokeServer({
+                                    PLOW_BLOCK:InvokeServer({
                                         block = Block
                                     })
                                 end

@@ -1,26 +1,37 @@
+--[[
+    Author: Jxl
+    Description: A serializer module
+]]
+
 local Serializer = {}
 
 do
-    local min = math.min
-    local max = math.max
-    local round = math.round
+    local CENTER_OFFSET = Vector3.new(1, 0, 0)
 
     Serializer.__index = Serializer
 
-    local function Round(Number) 
+    setmetatable(Serializer, {
+        __tostring = function()
+            return "Serializer"
+        end
+    })
+
+    function Serializer.new(Start, End)
+        return setmetatable({
+            Start = Start,
+            End = End
+        }, Serializer)
+    end
+
+    function Serializer:Round(Number) 
         if typeof(Number) == "number" then
-            return round(Number / 3) * 3
+            return math.round(Number / 3) * 3
         end
     end
 
-    function Serializer.new(Start, End)
-        print("new ser")
-        local self = setmetatable({}, Serializer)
-        
-        self.Start = Start
-        self.End = End
-
-        return self
+    function Serializer:Format(CF)
+        local x, y, z, m11, m12, m13, m21, m22, m23, m31, m32, m33 = CF:components()
+        return CFrame.new(self:Round(x), self:Round(y), self:Round(z), m11, m12, m13, m21, m22, m23, m31, m32, m33)
     end
 
     function Serializer:SetStart(Start)
@@ -29,11 +40,6 @@ do
 
     function Serializer:SetEnd(End)
         self.End = End
-    end
-
-    function Serializer:Format(CF)
-        local x, y, z, m11, m12, m13, m21, m22, m23, m31, m32, m33 = CF:components()
-        return CFrame.new(Round(x), Round(y), Round(z), m11, m12, m13, m21, m22, m23, m31, m32, m33)
     end
 
     function Serializer:Serialize()
@@ -61,11 +67,12 @@ do
         
         local CF, Size = Model:GetBoundingBox()
         local Start, End = CF.Position - Size / 2, CF.Position + Size / 2
-        local Center = self:Format(CFrame.new((Start + End) / 2)) - Vector3.new(1, 0, 0)
+
+        local Center = self:Format(CFrame.new((Start + End) / 2)) - CENTER_OFFSET
 
         for i, v in next, Model:GetChildren() do
             local Inserted = {}
-            if v:IsA("Model") then
+            if v.ClassName == "Model" then
                 Inserted.C = {Center:ToObjectSpace(v.PrimaryPart.CFrame):components()}
             elseif v:IsA("BasePart") then
                 Inserted.C = {Center:ToObjectSpace(v.CFrame):components()};
