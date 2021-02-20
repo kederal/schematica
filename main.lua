@@ -631,10 +631,10 @@ do
     local ConvertOldSection = Other:addSection("Convert Old Build")
 
     local Flags = {
-        Private = false,
+        Private = "Public",
         File = "",
         ToUpload = "",
-        UploadPrivate = false
+        UploadPrivate = "Public"
     }
 
     ConvertOldSection:addTextbox("File", "", function(File)
@@ -643,7 +643,7 @@ do
 
     local ClosestIslandSave = Other:addSection("Save Closest Island")
     ClosestIslandSave:addToggle("Unlisted", false, function(isPrivate)
-        Flags.Private = isPrivate
+        Flags.Private = isPrivate and "Private" or "Public"
     end)
 
     ClosestIslandSave:addButton("Save", function()
@@ -729,7 +729,7 @@ do
     end)
 
     UploadFile:addToggle("Unlisted", false, function(isPrivate)
-        Flags.UploadPrivate = isPrivate
+        Flags.UploadPrivate = isPrivate and "Private" or "Public"
     end)
 
     UploadFile:addButton("Upload", function()
@@ -740,7 +740,7 @@ do
                 Headers = {
                     ["Content-Type"] = "application/json",
                     ["Build-Name"] = Flags.ToUpload:gsub("%.(.+)", ""),
-                    ["Private"] = UploadPrivate and "Private" or "Public"
+                    ["Private"] = Flags.UploadPrivate
                 };
                 Method = "POST"
             })
