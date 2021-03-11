@@ -1,4 +1,4 @@
-local BASE_URL = "https://raw.githubusercontent.com/Jxl-v/schematica/main/"
+local BASE_URL = "https://raw.githubusercontent.com/wyn0001/schematica/main/"
 
 local function require_module(module) return loadstring(game:HttpGet(string.format("%sdependencies/%s", BASE_URL, module)))() end
 --local function require_module(module) return loadstring(readfile(string.format("schematica-script-workspace/dependencies/%s", module)))() end
