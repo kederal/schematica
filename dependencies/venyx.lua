@@ -1,16 +1,5 @@
 -- init
-local Playerss = game:GetService("Players")
-local player = Playerss.LocalPlayer
-	
--- anti afk
-local vu = game:GetService("VirtualUser")
-game:GetService("Players").LocalPlayer.Idled:connect(
-function()
-    vu:Button2Down(Vector2.new(0, 0), workspace.CurrentCamera.CFrame)
-    wait(math.random(0.3, 1.1))
-    vu:Button2Up(Vector2.new(0, 0), workspace.CurrentCamera.CFrame)
-end)
-
+local player = game.Players.LocalPlayer
 local mouse = player:GetMouse()
 
 -- services
@@ -106,12 +95,12 @@ do
 		object.ImageTransparency = 1
 		utility:Tween(clone, {Size = object.Size}, 0.2)
 		
-		coroutine.wrap(function()
+		spawn(function()
 			wait(0.2)
-
+		
 			object.ImageTransparency = 0
 			clone:Destroy()
-		end)()
+		end)
 		
 		return clone
 	end
@@ -222,11 +211,10 @@ do
 	
 	-- new classes
 	
-	function library.new(title, uiName)
+	function library.new(title)
 		local container = utility:Create("ScreenGui", {
-			Name = uiName,
-			Parent = game:GetService("CoreGui")
-			--Parent = game.CoreGui
+			Name = title,
+			Parent = game.CoreGui
 		}, {
 			utility:Create("ImageLabel", {
 				Name = "Main",
@@ -467,20 +455,6 @@ do
 				end
 			end
 		end
-end
-
-	function library:getTheme(theme)
-		if objects[theme] then
-			for property, objects in pairs(objects[theme]) do
-				for i, object in pairs(objects) do
-					if not object.Parent or (object.Name == "Button" and object.Parent.Name == "ColorPicker") then
-						objects[i] = nil -- i can do this because weak tables :D
-					else
-						return object[property]
-					end
-				end
-			end
-		end
 	end
 	
 	function library:toggle()
@@ -658,8 +632,12 @@ end
 		
 		self.activeNotification = close
 		
-		notification.Accept.MouseButton1Click:Connect(function()
-		
+		local connections = {}
+		connections.accept = notification.Accept.MouseButton1Click:Connect(function()
+			for i, v in next, connections do
+				v:Disconnect()
+			end
+
 			if not active then 
 				return
 			end
@@ -671,8 +649,11 @@ end
 			close()
 		end)
 		
-		notification.Decline.MouseButton1Click:Connect(function()
-		
+		connections.decline = notification.Decline.MouseButton1Click:Connect(function()
+			for i, v in next, connections do
+				v:Disconnect()
+			end
+
 			if not active then 
 				return
 			end
@@ -683,41 +664,6 @@ end
 			
 			close()
 		end)
-	end
-
-	function section:addLabel(title, default, callback)
-		local textbox = utility:Create("ImageButton", {
-			Name = "Textbox",
-			Parent = self.container,
-			BackgroundTransparency = 1,
-			BorderSizePixel = 0,
-			Size = UDim2.new(1, 0, 0, 30),
-			ZIndex = 2,
-			Image = "rbxassetid://5028857472",
-			ImageColor3 = themes.DarkContrast,
-			ScaleType = Enum.ScaleType.Slice,
-			SliceCenter = Rect.new(2, 2, 298, 298)
-		}, {
-			utility:Create("TextLabel", {
-				Name = "Title",
-				AnchorPoint = Vector2.new(0, 0.5),
-				BackgroundTransparency = 1,
-				Position = UDim2.new(0, 10, 0.5, 1),
-				Size = UDim2.new(0.5, 0, 1, 0),
-				ZIndex = 3,
-				Font = Enum.Font.Gotham,
-				Text = title,
-				TextColor3 = themes.TextColor,
-				TextSize = 12,
-				TextTransparency = 0.10000000149012,
-				TextXAlignment = Enum.TextXAlignment.Left
-			})
-		})
-		
-		table.insert(self.modules, textbox)
-		--self:Resize()
-		
-		return textbox
 	end
 	
 	function section:addButton(title, callback)
@@ -742,7 +688,7 @@ end
 				Text = title,
 				TextColor3 = themes.TextColor,
 				TextSize = 12,
-				TextTransparency = 0.10000000149012
+				TextTransparency = 0.1
 			})
 		})
 		
@@ -751,7 +697,7 @@ end
 		
 		local text = button.Title
 		local debounce
-		
+
 		button.MouseButton1Click:Connect(function()
 			
 			if debounce then
@@ -780,6 +726,39 @@ end
 		return button
 	end
 	
+	function section:addLabel(title)
+		local button = utility:Create("ImageLabel", {
+			Name = "Button",
+			Parent = self.container,
+			BackgroundTransparency = 1,
+			BorderSizePixel = 0,
+			Size = UDim2.new(1, 0, 0, 30),
+			ZIndex = 2,
+			Image = "rbxassetid://5028857472",
+			ImageColor3 = themes.DarkContrast,
+			ScaleType = Enum.ScaleType.Slice,
+			SliceCenter = Rect.new(2, 2, 298, 298)
+		}, {
+			utility:Create("TextLabel", {
+				Name = "Title",
+				BackgroundTransparency = 1,
+				Size = UDim2.new(1, 0, 1, 0),
+				ZIndex = 3,
+				Font = Enum.Font.Gotham,
+				Text = title,
+				TextColor3 = themes.TextColor,
+				TextSize = 12,
+				TextTransparency = 0.1,
+				TextXAlignment = Enum.TextXAlignment.Center
+			})
+		})
+		
+		table.insert(self.modules, button)
+		--self:Resize()
+		
+		return button
+	end
+
 	function section:addToggle(title, default, callback)
 		local toggle = utility:Create("ImageButton", {
 			Name = "Toggle",
@@ -804,7 +783,7 @@ end
 				Text = title,
 				TextColor3 = themes.TextColor,
 				TextSize = 12,
-				TextTransparency = 0.10000000149012,
+				TextTransparency = 0.1,
 				TextXAlignment = Enum.TextXAlignment.Left
 			}),
 			utility:Create("ImageLabel", {
@@ -832,25 +811,20 @@ end
 				})
 			})
 		})
-
+		
 		table.insert(self.modules, toggle)
 		--self:Resize()
-
+		
 		local active = default
-		local this = {}
 		self:updateToggle(toggle, nil, active)
-
-		function this:Get()
-			return active
-		end
-
-		function this:updateToggle(title, value)
-			return self:updateToggle(toggle, title, value)
-		end
-
-		this.Set = function(val)
-			active = val
-
+		
+		local toggleModule = {}
+		toggleModule.button = toggle
+		
+		toggleModule.toggle = function(state)
+			active = state
+			self:updateToggle(toggle, nil, active)
+			
 			if callback then
 				callback(active, function(...)
 					self:updateToggle(toggle, ...)
@@ -859,21 +833,10 @@ end
 		end
 
 		toggle.MouseButton1Click:Connect(function()
-			active = not active
-			self:updateToggle(toggle, nil, active)
-
-			if callback then
-				callback(active, function(...)
-					self:updateToggle(toggle, ...)
-				end)
-			end
+			toggleModule.toggle(not active)
 		end)
-
-		return setmetatable({}, {
-			__index = function(_, k)
-				return this[k] or toggle[k]
-			end
-		})
+		
+		return toggleModule
 	end
 	
 	function section:addTextbox(title, default, callback)
@@ -900,7 +863,7 @@ end
 				Text = title,
 				TextColor3 = themes.TextColor,
 				TextSize = 12,
-				TextTransparency = 0.10000000149012,
+				TextTransparency = 0.1,
 				TextXAlignment = Enum.TextXAlignment.Left
 			}),
 			utility:Create("ImageLabel", {
@@ -1008,7 +971,7 @@ end
 				Text = title,
 				TextColor3 = themes.TextColor,
 				TextSize = 12,
-				TextTransparency = 0.10000000149012,
+				TextTransparency = 0.1,
 				TextXAlignment = Enum.TextXAlignment.Left
 			}),
 			utility:Create("ImageLabel", {
@@ -1113,7 +1076,7 @@ end
 				Text = title,
 				TextColor3 = themes.TextColor,
 				TextSize = 12,
-				TextTransparency = 0.10000000149012,
+				TextTransparency = 0.1,
 				TextXAlignment = Enum.TextXAlignment.Left
 			}),
 			utility:Create("ImageButton", {
@@ -1637,7 +1600,7 @@ end
 				Text = title,
 				TextColor3 = themes.TextColor,
 				TextSize = 12,
-				TextTransparency = 0.10000000149012,
+				TextTransparency = 0.1,
 				TextXAlignment = Enum.TextXAlignment.Left
 			}),
 			utility:Create("TextBox", {
@@ -1799,7 +1762,7 @@ end
 					Text = title,
 					TextColor3 = themes.TextColor,
 					TextSize = 12,
-					TextTransparency = 0.10000000149012,
+					TextTransparency = 0.1,
 					TextXAlignment = Enum.TextXAlignment.Left
 				}),
 				utility:Create("ImageButton", {
@@ -1845,16 +1808,15 @@ end
 				})
 			})
 		})
-
+		
 		table.insert(self.modules, dropdown)
 		--self:Resize()
-
-		local this = {}
+		
 		local search = dropdown.Search
 		local focused
-
+		
 		list = list or {}
-
+		
 		search.Button.MouseButton1Click:Connect(function()
 			if search.Button.Rotation == 0 then
 				self:updateDropdown(dropdown, nil, list, callback)
@@ -1862,50 +1824,33 @@ end
 				self:updateDropdown(dropdown, nil, nil, callback)
 			end
 		end)
-
+		
 		search.TextBox.Focused:Connect(function()
 			if search.Button.Rotation == 0 then
 				self:updateDropdown(dropdown, nil, list, callback)
 			end
-
+			
 			focused = true
 		end)
-
+		
 		search.TextBox.FocusLost:Connect(function()
 			focused = false
 		end)
-
+		
 		search.TextBox:GetPropertyChangedSignal("Text"):Connect(function()
 			if focused then
 				local list = utility:Sort(search.TextBox.Text, list)
-				list = #list ~= 0 and list
-
+				list = #list ~= 0 and list 
+				
 				self:updateDropdown(dropdown, nil, list, callback)
 			end
 		end)
-
+		
 		dropdown:GetPropertyChangedSignal("Size"):Connect(function()
 			self:Resize()
 		end)
 		
-		function this:Get()
-			return search.TextBox.Text
-		end
-
-		local _self = self
-		function this:updateDropdown(title, list, callback)
-			return _self:updateDropdown(dropdown, title, list, callback)
-		end
-
-        return dropdown
-        
--- 		return setmetatable({}, {
--- 			__index = function(t, k)
--- 				return this[k] or dropdown[k]
--- 			end
--- 		})
-	    
-		
+		return dropdown
 	end
 	
 	-- class functions
@@ -2208,6 +2153,7 @@ end
 			end
 		end
 			
+		local connections = {}
 		for i, value in pairs(list or {}) do
 			local button = utility:Create("ImageButton", {
 				Parent = dropdown.List.Frame,
@@ -2230,18 +2176,23 @@ end
 					TextColor3 = themes.TextColor,
 					TextSize = 12,
 					TextXAlignment = "Left",
-					TextTransparency = 0.10000000149012
+					TextTransparency = 0.1
 				})
 			})
 			
-			button.MouseButton1Click:Connect(function()
+			table.insert(connections, button.MouseButton1Click:Connect(function()
+				for i, v in next, connections do
+					v:Disconnect()
+				end
+
 				if callback then
 					callback(value, function(...)
 						self:updateDropdown(dropdown, ...)
-					end)
+					end)	
 				end
+
 				self:updateDropdown(dropdown, value, nil, callback)
-			end)
+			end))
 			
 			entries = entries + 1
 		end
@@ -2268,5 +2219,4 @@ end
 	end
 end
 
-print("UI Library Credits: Denosaur @ v3rm")
 return library
